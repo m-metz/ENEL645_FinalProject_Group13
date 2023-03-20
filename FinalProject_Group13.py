@@ -1,8 +1,10 @@
 import tensorflow as tf
+import numpy as np
 
 IMAGE_SIZE = (224, 340)
 CROP_SIZE = (224, 224)
 BATCH_SIZE = 128
+MODEL_NAME = "group_13_best_model.h5"
 
 def dataset(ds_path, *,
             train,
@@ -72,13 +74,16 @@ def model_probas(test_dataset, model):
         'y_probas': y_probas
     }
 
-
-from tensorflow.keras.applications.vgg16 import VGG16
-from tensorflow.keras.applications.vgg16 import preprocess_input as vgg_preprocess
-from tensorflow.keras.models import Model, Sequential
-from tensorflow.keras.layers import Lambda, Input
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, Concatenate, BatchNormalization
-from tensorflow.keras.layers import Dropout, GlobalAveragePooling2D, Dense, Flatten, Activation
+"""
+Change back to tensorflow.keras to turn on lazy loading of imports and to
+match the exact keras version that tensorflow uses as of 
+"""
+from keras.applications.vgg16 import VGG16
+from keras.applications.vgg16 import preprocess_input as vgg_preprocess
+from keras.models import Model, Sequential
+from keras.layers import Lambda, Input
+from keras.layers import Conv2D, MaxPooling2D, Concatenate, BatchNormalization
+from keras.layers import Dropout, GlobalAveragePooling2D, Dense, Flatten, Activation
 
 
 def vgginnet_builder():
@@ -140,98 +145,52 @@ def get_data_loaders(images_path, val_split, test_split, batch_size=32, verbose=
 
     return trainloader, valloader, testloader
 
-# Learning rate schedule
-def scheduler(epoch, lr):
-    if epoch%4 == 0 and epoch!= 0:
-        lr = lr/2
-    return lr   
-
-def train_validate(model, trainloader, valloader, epochs, batch_size,
+def train_validate(model: Model, train_ds, val_ds, epochs, batch_size,
                    learning_rate, best_model_path, device, verbose):
+    #
+    # Define your callbacks (save best model, early stopping, learning rate scheduler)
+    #
+    early_stop = tf.keras.callbacks.EarlyStopping(
+        monitor='val_loss', patience=20)
 
-    # Define your callbacks (save your model, patience, etc.)
-    model_name = "group_13_best_model.h5"
-    early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience = 20)
+    monitor = tf.keras.callbacks.ModelCheckpoint(
+        MODEL_NAME, monitor='val_loss',
+        verbose=0, save_best_only=True,
+        save_weights_only=False,
+        mode='min')
 
-    monitor = tf.keras.callbacks.ModelCheckpoint(model_name, monitor='val_loss',\
-                                                verbose=0, save_best_only=True,\
-                                                save_weights_only=False,\
-                                                mode='min')
+    # Learning rate schedule
+    # Reduce learning rate every 4 epochs.
+    def scheduler(epoch, lr):
+        if epoch % 4 == 0 and epoch != 0:
+            lr = lr/2
+        return lr
+    lr_schedule = tf.keras.callbacks.LearningRateScheduler(
+        scheduler, verbose=0)
 
+    # Show model summary before training.
+    print(model.summary())
 
-    lr_schedule = tf.keras.callbacks.LearningRateScheduler(scheduler,verbose = 0)
+    #
+    # Define optimizer, loss function, and metrics.
+    #
+    model.compile(optimizer=tf.keras.optimizers.Adam(lr=1e-4),
+                  loss='categorical_crossentropy',
+                  metrics=['accuracy'])
 
-    model.compile(optimizer=tf.keras.optimizers.Adam(lr = 1e-4),
-              loss='categorical_crossentropy',
-              metrics=['accuracy'])
-
-
-    model.fit(train_ds, epochs = 5, \
-          verbose = 1, callbacks= [early_stop, monitor, lr_schedule], validation_data=(val_flow))
-
-
-    best_loss = 1e+20
-    for epoch in range(epochs):  # loop over the dataset multiple times
-
-        # Loss function and optimizer
-        criterion = model.CrossEntropyLoss()  # Loss function
-        optimizer = torch.optim.AdamW(net.parameters(), lr=learning_rate)
-        scheduler = ExponentialLR(optimizer, gamma=0.9)
-
-        # Training Loop
-        train_loss = 0.0
-        for i, data in enumerate(trainloader, 0):
-            # get the inputs; data is a list of [inputs, labels]
-            inputs, labels = data[0].to(device), data[1].to(device)
-            # zero the parameter gradients
-            optimizer.zero_grad()
-
-            # forward + backward + optimize
-            outputs = net(inputs)
-
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-
-            train_loss += loss.item()
-        print(f'{epoch + 1},  train loss: {train_loss / i:.3f},', end=' ')
-        scheduler.step()
-
-        val_loss = 0
-        # since we're not training, we don't need to calculate the gradients for our outputs
-        with torch.no_grad():
-            for i, data in enumerate(valloader, 0):
-                # get the inputs; data is a list of [inputs, labels]
-                inputs, labels = data[0].to(device), data[1].to(device)
-                outputs = net(inputs)
-                loss = criterion(outputs, labels)
-
-                val_loss += loss.item()
-            print(f'val loss: {val_loss / i:.3f}')
-
-            # Save best model
-            if val_loss < best_loss:
-                print("Saving model")
-                torch.save(net.state_dict(), best_model_path)
-                best_loss = val_loss
-
-    print('Finished Training')
+    model.fit(train_ds, epochs=5,
+              verbose=1, callbacks=[early_stop, monitor, lr_schedule], validation_data=(val_ds))
 
 
-def test(net, testloader):
+def test(model, X_test, Y_test_oh, Y_test):
+    """
+        X_test: Expects X_test to be preprocessed for pre-trained model.
+    """
 
-    correct = 0
-    total = 0
-    # since we're not training, we don't need to calculate the gradients for our outputs
-    with torch.no_grad():
-        for data in testloader:
-            images, labels = data
-            # calculate outputs by running images through the network
-            outputs = net(images)
-            # the class with the highest energy is what we choose as prediction
-            _, predicted = torch.max(outputs.data, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
+    model.load_weights(MODEL_NAME)
+    metrics = model.evaluate(X_test, Y_test_oh)
 
-    print(
-        f'Accuracy of the network on the test images: {100 * correct / total} %')
+    Ypred = model.predict(X_test).argmax(axis = 1)
+    wrong_indexes = np.where(Ypred != Y_test)[0]
+
+    return metrics, wrong_indexes
