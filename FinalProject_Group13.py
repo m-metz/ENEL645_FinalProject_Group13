@@ -1,10 +1,22 @@
 import tensorflow as tf
 import numpy as np
 
+"""
+Change back to tensorflow.keras to turn on lazy loading of imports and to
+match the exact keras version that tensorflow uses as of 
+"""
+from keras.applications.vgg16 import VGG16
+from keras.applications.vgg16 import preprocess_input as vgg_preprocess
+from keras.models import Model
+from keras.layers import Lambda, Input
+from keras.layers import Conv2D, MaxPooling2D, Concatenate, BatchNormalization
+from keras.layers import Dropout, Dense, Flatten
+
 IMAGE_SIZE = (224, 340)
 CROP_SIZE = (224, 224)
 BATCH_SIZE = 128
 MODEL_NAME = "group_13_best_model.h5"
+
 
 def dataset(ds_path, *,
             train,
@@ -56,7 +68,7 @@ def dataset(ds_path, *,
     return ds
 
 
-def model_probas(test_dataset, model):
+def model_probas(test_dataset, model: Model):
     """Returns the predicted probabilities and the true labels
     for a given (inference) dataset on a given model."""
     y_test, y_probas = [], []
@@ -73,17 +85,6 @@ def model_probas(test_dataset, model):
         'y_test': y_test,
         'y_probas': y_probas
     }
-
-"""
-Change back to tensorflow.keras to turn on lazy loading of imports and to
-match the exact keras version that tensorflow uses as of 
-"""
-from keras.applications.vgg16 import VGG16
-from keras.applications.vgg16 import preprocess_input as vgg_preprocess
-from keras.models import Model, Sequential
-from keras.layers import Lambda, Input
-from keras.layers import Conv2D, MaxPooling2D, Concatenate, BatchNormalization
-from keras.layers import Dropout, GlobalAveragePooling2D, Dense, Flatten, Activation
 
 
 def vgginnet_builder():
@@ -126,7 +127,7 @@ def vgginnet_builder():
     model = Model(inputs=feature_ex_model.input, outputs=desne)
     return model
 
-#AFTER HERE IS PYTORCH~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 def get_data_loaders(images_path, val_split, test_split, batch_size=32, verbose=True):
     """
     These function generates the data loaders for our problem. It assumes paths are
@@ -144,6 +145,7 @@ def get_data_loaders(images_path, val_split, test_split, batch_size=32, verbose=
     """
 
     return trainloader, valloader, testloader
+
 
 def train_validate(model: Model, train_ds, val_ds, epochs, batch_size,
                    learning_rate, best_model_path, device, verbose):
@@ -182,7 +184,7 @@ def train_validate(model: Model, train_ds, val_ds, epochs, batch_size,
               verbose=1, callbacks=[early_stop, monitor, lr_schedule], validation_data=(val_ds))
 
 
-def test(model, X_test, Y_test_oh, Y_test):
+def test(model: Model, X_test, Y_test_oh, Y_test):
     """
         X_test: Expects X_test to be preprocessed for pre-trained model.
     """
