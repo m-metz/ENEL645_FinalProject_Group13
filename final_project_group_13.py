@@ -150,11 +150,12 @@ def get_data_loaders(images_path, val_split, test_split, batch_size=32, verbose=
     return trainloader, valloader, testloader
 
 
-def train_validate(model: Model, train_ds, val_ds, epochs, batch_size,
-                   learning_rate, best_model_path, device, verbose):
+def train_validate(model: Model, train_ds, val_ds, epochs=5, learning_rate=1e-4):
+
     #
     # Define your callbacks (save best model, early stopping, learning rate scheduler)
     #
+
     early_stop = tf.keras.callbacks.EarlyStopping(
         monitor='val_loss', patience=20)
 
@@ -177,25 +178,34 @@ def train_validate(model: Model, train_ds, val_ds, epochs, batch_size,
     print(model.summary())
 
     #
-    # Define optimizer, loss function, and metrics.
+    # Configure and train the model
     #
-    model.compile(optimizer=tf.keras.optimizers.Adam(lr=1e-4),
+
+    # Define optimizer, loss function, and metrics.
+    model.compile(optimizer=tf.keras.optimizers.Adam(lr=learning_rate),
                   loss='categorical_crossentropy',
                   metrics=['accuracy'])
 
-    model.fit(train_ds, epochs=5,
+    model.fit(train_ds, epochs=epochs,
               verbose=1, callbacks=[early_stop, monitor, lr_schedule], validation_data=(val_ds))
 
 
-def test(model: Model, X_test, Y_test_oh, Y_test):
+def test(model: Model, test_ds: tf.data.Dataset):
     """
-        X_test: Expects X_test to be preprocessed for pre-trained model.
+    Args:
+        test_ds: Expects test_ds to be preprocessed for pre-trained model.
     """
 
     model.load_weights(MODEL_NAME)
-    metrics = model.evaluate(X_test, Y_test_oh)
+    metrics = model.evaluate(test_ds)
 
-    Ypred = model.predict(X_test).argmax(axis=1)
+    Ypred = model.predict(test_ds).argmax(axis=1)
+    label_batch_list = []
+    for _, label_batch in test_ds:
+        label_batch_list.append(label_batch)
+    Y_test_t = tf.concat(label_batch_list, axis=0)
+    Y_test = Y_test_t.numpy()
+    
     wrong_indexes = np.where(Ypred != Y_test)[0]
 
     return metrics, wrong_indexes
