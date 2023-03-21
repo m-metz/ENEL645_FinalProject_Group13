@@ -3,7 +3,7 @@ import numpy as np
 
 """
 Change back to tensorflow.keras to turn on lazy loading of imports and to
-match the exact keras version that tensorflow uses as of 
+match the exact keras version that tensorflow uses as of tensorflow 2.10
 """
 from keras.applications.vgg16 import VGG16
 from keras.applications.vgg16 import preprocess_input as vgg_preprocess
