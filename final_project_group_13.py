@@ -453,7 +453,7 @@ def resnetnaive_builder():
     model = Model(inputs=feature_ex_model.input, outputs=desne)
     return model
 
-def train_validate(model: Model, train_ds, val_ds, epochs=5, learning_rate=1e-4):
+def train_validate(model: Model, train_ds, val_ds, epochs=100, learning_rate=1e-3):
 
     #
     # Define your callbacks (save best model, early stopping, learning rate scheduler)
@@ -474,7 +474,7 @@ def train_validate(model: Model, train_ds, val_ds, epochs=5, learning_rate=1e-4)
     # Learning rate schedule
     # Reduce learning rate every 4 epochs.
     def scheduler(epoch, lr):
-        if epoch % 4 == 0 and epoch != 0:
+        if epoch % 4 == 0 and epoch >= 15:
             lr = lr/2
         return lr
 
