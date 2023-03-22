@@ -14,10 +14,13 @@ match the exact keras version that tensorflow uses as of tensorflow 2.10
 '''
 from keras.applications.vgg16 import VGG16
 from keras.applications.vgg16 import preprocess_input as vgg_preprocess
+from keras.applications.resnet import preprocess_input as resnet_preprocess
 from keras.models import Model
+from keras.models import Model, Sequential
 from keras.layers import Lambda, Input
 from keras.layers import Conv2D, MaxPooling2D, Concatenate, BatchNormalization
 from keras.layers import Dropout, Dense, Flatten
+from keras.layers import Dropout, GlobalAveragePooling2D, Dense, Flatten, Activation
 
 AUTOTUNE = tf.data.AUTOTUNE
 
@@ -335,86 +338,28 @@ def preprocess_test(
     return test_ds.prefetch(buffer_size=AUTOTUNE)
 
 
-def dataset(ds_path,
-            *,
-            train,
-            preprocess_fn=None,
-            image_size=image_size,
-            crop_size=crop_size,
-            batch_size=batch_size):
-    """Returns a tf.data.Dataset pipeline suitable for training / inference.
-    Training pipeline: uses data augmentation, random crops.
-    Inference (test, val) pipeline: uses only central crop.
 
-    Preprocessing function is applied at the end of each pipeline.
-    """
+# Models
 
-    ds = tf.keras.preprocessing.image_dataset_from_directory(
-        ds_path,
-        shuffle=train,
-        label_mode='categorical',
-        batch_size=batch_size,
-        image_size=image_size)
+# Classic Resnet50 with transfer learning
 
-    gen = tf.keras.preprocessing.image.ImageDataGenerator(
-        rotation_range=20,
-        width_shift_range=0.2,
-        height_shift_range=0.2,
-        horizontal_flip=True,
-        vertical_flip=True,
-        shear_range=0.2,
-        zoom_range=0.2)
+def resnet50_builder():
+    base_model = tf.keras.applications.resnet50.ResNet50(
+        weights='imagenet',  
+        input_shape=(224,224,3),
+        include_top=False) 
+    base_model.trainable = False
 
-    @tf.function
-    def augment(images, labels):
-        aug_images = tf.map_fn(
-            lambda image: tf.numpy_function(
-                gen.random_transform,
-                [image],
-                tf.float32),
-            images)
-        aug_images = tf.ensure_shape(aug_images, images.shape)
-        return aug_images, labels
+    x1 = base_model(base_model.input, training = False)
+    x2 = tf.keras.layers.Flatten()(x1)
+    num_classes = 2
 
-    crop_layer = tf.keras.layers.experimental.preprocessing.RandomCrop(
-        *crop_size)
+    out = tf.keras.layers.Dense(num_classes, activation = 'softmax')(x2)
+    model = tf.keras.Model(inputs = base_model.input, outputs =out)
 
-    @tf.function
-    def crop(images, labels):
-        cropped_images = crop_layer(images, training=train)
-        return cropped_images, labels
+    return model
 
-    if train:
-        ds = ds.map(augment, tf.data.experimental.AUTOTUNE)
-
-    ds = ds.map(crop, tf.data.experimental.AUTOTUNE)
-
-    if preprocess_fn:
-        ds = ds.map(preprocess_fn)
-
-    ds = ds.prefetch(tf.data.experimental.AUTOTUNE)
-
-    return ds
-
-
-def model_probas(test_dataset, model: Model):
-    """Returns the predicted probabilities and the true labels
-    for a given (inference) dataset on a given model."""
-    y_test, y_probas = [], []
-
-    for image_batch, label_batch in test_dataset:
-        y_test.append(label_batch)
-        y_probas.append(model.predict(image_batch))
-
-    y_test, y_probas = (
-        tf.concat(y_test, axis=0),
-        tf.concat(y_probas, axis=0))
-
-    return {
-        'y_test': y_test,
-        'y_probas': y_probas
-    }
-
+# Vgg16 + Naive Inception Block
 
 def vgginnet_builder():
     base_model = VGG16(include_top=False, input_shape=(224, 224, 3))
@@ -460,25 +405,51 @@ def vgginnet_builder():
     model = Model(inputs=feature_ex_model.input, outputs=desne)
     return model
 
+# Resnet50 + Naive Inception Block
 
-def get_data_loaders(images_path, val_split, test_split, batch_size=32, verbose=True):
-    """
-    These function generates the data loaders for our problem. It assumes paths are
-    defined by "/" and image files are jpg. Each subfolder in the images_path 
-    represents a different class.
+def resnetnaive_builder():
+    base_model = tf.keras.applications.resnet50.ResNet50(
+        weights='imagenet',  
+        input_shape=(224,224,3),
+        include_top=False) 
+    
 
-    Args:
-        images_path (_type_): Path to folders containing images of each class.
-        val_split (_type_): percentage of data to be used in the val set
-        test_split (_type_): percentage of data to be used in the val set
-        verbose (_type_): debug flag
+    layer_name = 'conv5_block3_out'
+    feature_ex_model = Model(inputs=base_model.input, 
+                             outputs=base_model.get_layer(layer_name).output, 
+                             name='resnet50_features')
+    feature_ex_model.trainable = False
 
-    Returns:
-        DataLoader: Train, validation and test data laoders.
-    """
+    p1_layer = Lambda(resnet_preprocess, name='Resnet_Preprocess')
+    image_input = Input((224, 224, 3), name='Image_Input')
+    p1_tensor = p1_layer(image_input)
 
-    return trainloader, valloader, testloader
+    out =feature_ex_model(p1_tensor)
+    feature_ex_model = Model(inputs=image_input, outputs=out)
 
+    def naive_inception_module(layer_in, f1, f2, f3):
+        # 1x1 conv
+        conv1 = Conv2D(f1, (1,1), padding='same', activation='relu')(layer_in)
+        # 3x3 conv
+        conv3 = Conv2D(f2, (3,3), padding='same', activation='relu')(layer_in)
+        # 5x5 conv
+        conv5 = Conv2D(f3, (5,5), padding='same', activation='relu')(layer_in)
+        # 3x3 max pooling
+        pool = MaxPooling2D((3,3), strides=(1,1), padding='same')(layer_in)
+        # concatenate filters, assumes filters/channels last
+        layer_out = Concatenate()([conv1, conv3, conv5, pool])
+        return layer_out
+
+    out = naive_inception_module(feature_ex_model.output, 64, 128, 32)
+    num_classes = 2
+
+    bn1 = BatchNormalization(name='BN')(out)
+    f = Flatten()(bn1)
+    dropout = Dropout(0.4, name='Dropout')(f)
+    desne = Dense(num_classes, activation='softmax', name='Predictions')(dropout)
+
+    model = Model(inputs=feature_ex_model.input, outputs=desne)
+    return model
 
 def train_validate(model: Model, train_ds, val_ds, epochs=5, learning_rate=1e-4):
 
@@ -530,22 +501,13 @@ def train_validate(model: Model, train_ds, val_ds, epochs=5, learning_rate=1e-4)
         validation_data=(val_ds))
 
 
-def test(model: Model, test_ds: tf.data.Dataset):
+def test(model_name, test_ds: tf.data.Dataset):
     """
     Args:
         test_ds: Expects test_ds to be preprocessed for pre-trained model.
     """
 
-    model.load_weights(model_name)
+    model = model.tf.keras.models.load_model(model_name)
     metrics = model.evaluate(test_ds)
 
-    Ypred = model.predict(test_ds).argmax(axis=1)
-    label_batch_list = []
-    for _, label_batch in test_ds:
-        label_batch_list.append(label_batch)
-    Y_test_t = tf.concat(label_batch_list, axis=0)
-    Y_test = Y_test_t.numpy()
-
-    wrong_indexes = np.where(Ypred != Y_test)[0]
-
-    return metrics, wrong_indexes
+    return metrics
