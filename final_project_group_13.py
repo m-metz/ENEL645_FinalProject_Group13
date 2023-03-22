@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import tensorflow as tf
+import tensorflow_addons as tfa
 import matplotlib.pylab as plt
 
 '''
@@ -21,6 +22,7 @@ from keras.layers import Lambda, Input
 from keras.layers import Conv2D, MaxPooling2D, Concatenate, BatchNormalization
 from keras.layers import Dropout, Dense, Flatten
 from keras.layers import Dropout, GlobalAveragePooling2D, Dense, Flatten, Activation
+
 
 AUTOTUNE = tf.data.AUTOTUNE
 
@@ -491,7 +493,11 @@ def train_validate(model: Model, train_ds, val_ds, epochs=5, learning_rate=1e-4)
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
         loss='categorical_crossentropy',
-        metrics=['accuracy', 'f1_score', 'geometric_mean'])
+        metrics=['accuracy', 
+                 tfa.metrics.F1Score(num_classes= 2, name='f1_score'),
+                 'mae'])
+                 
+                 
 
     model.fit(
         train_ds,
