@@ -491,7 +491,7 @@ def train_validate(model: Model, train_ds, val_ds, epochs=5, learning_rate=1e-4)
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
         loss='categorical_crossentropy',
-        metrics=['accuracy'])
+        metrics=['accuracy', 'f1_score', 'geometric_mean'])
 
     model.fit(
         train_ds,
