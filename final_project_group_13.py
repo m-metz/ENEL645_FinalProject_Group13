@@ -506,8 +506,7 @@ def test(model_name, test_ds: tf.data.Dataset):
     Args:
         test_ds: Expects test_ds to be preprocessed for pre-trained model.
     """
-
-    model = model.tf.keras.models.load_model(model_name)
+    model = tf.keras.models.load_model(model_name)
     metrics = model.evaluate(test_ds)
 
     return metrics
