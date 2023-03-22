@@ -500,7 +500,7 @@ def train_validate(model: Model, train_ds, val_ds, epochs=5, learning_rate=1e-4)
     #
 
     # Define optimizer, loss function, and metrics.
-    model.compile(optimizer=tf.keras.optimizers.Adam(lr=learning_rate),
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
                   loss='categorical_crossentropy',
                   metrics=['accuracy'])
 
