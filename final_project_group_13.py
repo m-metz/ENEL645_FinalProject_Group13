@@ -111,8 +111,7 @@ def stratified_train_val_test_split_into_folders(
         train_split=train_split,
         validation_split=validation_split,
         test_split=test_split,
-        random_seed=random_seed
-):
+        random_seed=random_seed):
     """
     Loops through the `class_list` and splits the data set into train, test,
     and validation datasets. The images will be in `split_data_path`/`
@@ -295,7 +294,7 @@ def preprocess_train_val(
             augmentation_layer(image, training=True),
             label),
         num_parallel_calls=AUTOTUNE)
-    
+
     train_ds = train_ds.map(
         lambda image, label: (
             crop_layer(image, training=True),
@@ -336,7 +335,8 @@ def preprocess_test(
     return test_ds.prefetch(buffer_size=AUTOTUNE)
 
 
-def dataset(ds_path, *,
+def dataset(ds_path,
+            *,
             train,
             preprocess_fn=None,
             image_size=image_size,
@@ -350,8 +350,11 @@ def dataset(ds_path, *,
     """
 
     ds = tf.keras.preprocessing.image_dataset_from_directory(
-        ds_path, shuffle=train, label_mode='categorical',
-        batch_size=batch_size, image_size=image_size)
+        ds_path,
+        shuffle=train,
+        label_mode='categorical',
+        batch_size=batch_size,
+        image_size=image_size)
 
     gen = tf.keras.preprocessing.image.ImageDataGenerator(
         rotation_range=20,
@@ -364,10 +367,12 @@ def dataset(ds_path, *,
 
     @tf.function
     def augment(images, labels):
-        aug_images = tf.map_fn(lambda image: tf.numpy_function(gen.random_transform,
-                                                               [image],
-                                                               tf.float32),
-                               images)
+        aug_images = tf.map_fn(
+            lambda image: tf.numpy_function(
+                gen.random_transform,
+                [image],
+                tf.float32),
+            images)
         aug_images = tf.ensure_shape(aug_images, images.shape)
         return aug_images, labels
 
@@ -381,10 +386,14 @@ def dataset(ds_path, *,
 
     if train:
         ds = ds.map(augment, tf.data.experimental.AUTOTUNE)
+
     ds = ds.map(crop, tf.data.experimental.AUTOTUNE)
+
     if preprocess_fn:
         ds = ds.map(preprocess_fn)
+
     ds = ds.prefetch(tf.data.experimental.AUTOTUNE)
+
     return ds
 
 
@@ -411,9 +420,10 @@ def vgginnet_builder():
     base_model = VGG16(include_top=False, input_shape=(224, 224, 3))
 
     layer_name = 'block4_pool'
-    feature_ex_model = Model(inputs=base_model.input,
-                             outputs=base_model.get_layer(layer_name).output,
-                             name='vgg16_features')
+    feature_ex_model = Model(
+        inputs=base_model.input,
+        outputs=base_model.get_layer(layer_name).output,
+        name='vgg16_features')
     feature_ex_model.trainable = False
 
     p1_layer = Lambda(vgg_preprocess, name='VGG_Preprocess')
@@ -442,8 +452,10 @@ def vgginnet_builder():
     bn1 = BatchNormalization(name='BN')(out)
     f = Flatten()(bn1)
     dropout = Dropout(0.4, name='Dropout')(f)
-    desne = Dense(num_classes, activation='softmax',
-                  name='Predictions')(dropout)
+    desne = Dense(
+        num_classes,
+        activation='softmax',
+        name='Predictions')(dropout)
 
     model = Model(inputs=feature_ex_model.input, outputs=desne)
     return model
@@ -475,11 +487,14 @@ def train_validate(model: Model, train_ds, val_ds, epochs=5, learning_rate=1e-4)
     #
 
     early_stop = tf.keras.callbacks.EarlyStopping(
-        monitor='val_loss', patience=20)
+        monitor='val_loss',
+        patience=20)
 
     monitor = tf.keras.callbacks.ModelCheckpoint(
-        model_name, monitor='val_loss',
-        verbose=0, save_best_only=True,
+        model_name,
+        monitor='val_loss',
+        verbose=0,
+        save_best_only=True,
         save_weights_only=False,
         mode='min')
 
@@ -489,8 +504,10 @@ def train_validate(model: Model, train_ds, val_ds, epochs=5, learning_rate=1e-4)
         if epoch % 4 == 0 and epoch != 0:
             lr = lr/2
         return lr
+
     lr_schedule = tf.keras.callbacks.LearningRateScheduler(
-        scheduler, verbose=0)
+        scheduler,
+        verbose=0)
 
     # Show model summary before training.
     print(model.summary())
@@ -500,12 +517,17 @@ def train_validate(model: Model, train_ds, val_ds, epochs=5, learning_rate=1e-4)
     #
 
     # Define optimizer, loss function, and metrics.
-    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-                  loss='categorical_crossentropy',
-                  metrics=['accuracy'])
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+        loss='categorical_crossentropy',
+        metrics=['accuracy'])
 
-    model.fit(train_ds, epochs=epochs,
-              verbose=1, callbacks=[early_stop, monitor, lr_schedule], validation_data=(val_ds))
+    model.fit(
+        train_ds,
+        epochs=epochs,
+        verbose=1,
+        callbacks=[early_stop, monitor, lr_schedule],
+        validation_data=(val_ds))
 
 
 def test(model: Model, test_ds: tf.data.Dataset):
