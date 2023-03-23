@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import tensorflow as tf
+import tensorflow_addons as tfa
 import matplotlib.pylab as plt
 
 '''
@@ -21,6 +22,7 @@ from keras.layers import Lambda, Input
 from keras.layers import Conv2D, MaxPooling2D, Concatenate, BatchNormalization
 from keras.layers import Dropout, Dense, Flatten
 from keras.layers import Dropout, GlobalAveragePooling2D, Dense, Flatten, Activation
+
 
 AUTOTUNE = tf.data.AUTOTUNE
 
@@ -258,7 +260,8 @@ def preprocess_train_val(
         *,
         image_size=image_size,
         crop_size=crop_size,
-        batch_size=batch_size):
+        batch_size=batch_size
+) -> tf.data.Dataset:
     """ 
     This function will take parameters for the datas file path along with the image, crop, and batch size. It will then perform the training
     set's cropping and data augmentation and return the dataset once it is transformed.
@@ -321,7 +324,8 @@ def preprocess_test(
         *,
         image_size=image_size,
         crop_size=crop_size,
-        batch_size=batch_size):
+        batch_size=batch_size
+) -> tf.data.Dataset:
 
     crop_layer = tf.keras.layers.CenterCrop(*crop_size)
 
@@ -454,7 +458,7 @@ def resnetnaive_builder():
     model = Model(inputs=feature_ex_model.input, outputs=desne)
     return model
 
-def train_validate(model: Model, train_ds, val_ds, epochs=5, learning_rate=1e-4):
+def train_validate(model: Model, train_ds, val_ds, epochs=100, learning_rate=1e-3):
 
     #
     # Define your callbacks (save best model, early stopping, learning rate scheduler)
@@ -475,7 +479,7 @@ def train_validate(model: Model, train_ds, val_ds, epochs=5, learning_rate=1e-4)
     # Learning rate schedule
     # Reduce learning rate every 4 epochs.
     def scheduler(epoch, lr):
-        if epoch % 4 == 0 and epoch != 0:
+        if epoch % 4 == 0 and epoch >= 15:
             lr = lr/2
         return lr
 
@@ -494,7 +498,11 @@ def train_validate(model: Model, train_ds, val_ds, epochs=5, learning_rate=1e-4)
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
         loss='categorical_crossentropy',
-        metrics=['accuracy'])
+        metrics=['accuracy', 
+                 tfa.metrics.F1Score(num_classes= 2, name='f1_score'),
+                 'mae'])
+                 
+                 
 
     model.fit(
         train_ds,
@@ -509,8 +517,7 @@ def test(model_name, test_ds: tf.data.Dataset):
     Args:
         test_ds: Expects test_ds to be preprocessed for pre-trained model.
     """
-
-    model = model.tf.keras.models.load_model(model_name)
+    model = tf.keras.models.load_model(model_name)
     metrics = model.evaluate(test_ds)
 
     return metrics
