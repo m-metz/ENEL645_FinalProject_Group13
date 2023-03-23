@@ -267,7 +267,7 @@ def preprocess_train_val(
     set's cropping and data augmentation and return the dataset once it is transformed.
     """
 
-    crop_layer = tf.keras.layers.CenterCrop(*crop_size)
+    crop_layer = tf.keras.layers.RandomCrop(*crop_size, seed=random_seed)
     augmentation_layer = tf.keras.Sequential(
         [
             tf.keras.layers.RandomFlip(),
