@@ -272,7 +272,10 @@ def preprocess_train_val(
             tf.keras.layers.RandomContrast(0.1, seed=random_seed),
             tf.keras.layers.RandomHeight(0.2, seed=random_seed),
             tf.keras.layers.RandomWidth(0.2, seed=random_seed),
+            tf.keras.layers.RandomZoom(0.2,seed=random_seed),
             tf.keras.layers.Resizing(224, 340, crop_to_aspect_ratio=True)
+            
+
         ]
     )
 
