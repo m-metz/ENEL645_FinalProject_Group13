@@ -258,7 +258,8 @@ def preprocess_train_val(
         *,
         image_size=image_size,
         crop_size=crop_size,
-        batch_size=batch_size):
+        batch_size=batch_size
+) -> tf.data.Dataset:
     """ 
     This function will take parameters for the datas file path along with the image, crop, and batch size. It will then perform the training
     set's cropping and data augmentation and return the dataset once it is transformed.
@@ -318,7 +319,8 @@ def preprocess_test(
         *,
         image_size=image_size,
         crop_size=crop_size,
-        batch_size=batch_size):
+        batch_size=batch_size
+) -> tf.data.Dataset:
 
     crop_layer = tf.keras.layers.CenterCrop(*crop_size)
 
