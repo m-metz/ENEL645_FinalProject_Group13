@@ -94,11 +94,6 @@ crop_size = (224, 224)
 The size to randomly crop all images to during preprocessing (including train, validation, test).
 '''
 
-model_name = "group_13_best_model.h5"
-'''
-The name of the file to save the best model to (in .h5 format).
-'''
-
 
 '''
 ---
@@ -468,7 +463,7 @@ def resnetnaive_builder(layer_name):
     model = Model(inputs=feature_ex_model.input, outputs=dense)
     return model
 
-def train_validate(model: Model, train_ds, val_ds, epochs=100, learning_rate=1e-3):
+def train_validate(model: Model, train_ds, val_ds, *, best_model_file='group_13_best_model.h5', epochs=100, learning_rate=1e-3):
 
     #
     # Define your callbacks (save best model, early stopping, learning rate scheduler)
@@ -479,7 +474,7 @@ def train_validate(model: Model, train_ds, val_ds, epochs=100, learning_rate=1e-
         patience=20)
 
     monitor = tf.keras.callbacks.ModelCheckpoint(
-        model_name,
+        best_model_file,
         monitor='val_loss',
         verbose=0,
         save_best_only=True,
@@ -487,7 +482,7 @@ def train_validate(model: Model, train_ds, val_ds, epochs=100, learning_rate=1e-
         mode='min')
 
     # Learning rate schedule
-    # Reduce learning rate every 4 epochs.
+    # Reduce learning rate every M epochs after N epochs.
     def scheduler(epoch, lr):
         if epoch % 4 == 0 and epoch >= 15:
             lr = lr/2
@@ -512,8 +507,6 @@ def train_validate(model: Model, train_ds, val_ds, epochs=100, learning_rate=1e-
                  tfa.metrics.F1Score(num_classes= 2, name='f1_score'),
                  'mae'])
                  
-                 
-
     model.fit(
         train_ds,
         epochs=epochs,
@@ -522,12 +515,22 @@ def train_validate(model: Model, train_ds, val_ds, epochs=100, learning_rate=1e-
         validation_data=(val_ds))
 
 
-def test(model_name, test_ds: tf.data.Dataset):
+def test(model_file, test_ds: tf.data.Dataset):
     """
     Args:
         test_ds: Expects test_ds to be preprocessed for pre-trained model.
     """
-    model = tf.keras.models.load_model(model_name)
+    model: Model = tf.keras.models.load_model(model_file)
     metrics = model.evaluate(test_ds)
 
-    return metrics
+    
+    '''
+    Rename f1_score to include class names, as f1 scores per class are outputted.
+    '''
+    metric_names = []
+    for name in model.metrics_names:
+        if name.lower() == 'f1_score':
+            name = '_'.join([name] + class_list)
+        metric_names.append(name)
+
+    return dict(zip(metric_names, metrics))
