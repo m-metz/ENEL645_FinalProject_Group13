@@ -414,14 +414,24 @@ def vgginnet_builder():
 
 # Resnet50 + Naive Inception Block
 
-def resnetnaive_builder():
+def resnetnaive_builder(layer_name):
+    """
+    function that inserts a naive block of layers after a specific block of a pretrained resnet50's architecture. 
+    Params:
+    layer_name - name of resnet50's block where Naive Inception will be inserted. Remaining blocks of resnet50 are discarded. 
+    Classification layer is connected right after Naive Block. 
+    Possible values:
+    'conv2_block3_out' - Naive inception block will be inserted after second convolutional block.
+    'conv3_block4_out' - Naive inception block will be inserted after third convolutional block.
+    'conv4_block6_out' - Naive inception block will be inserted after fourth convolutional block.
+    'conv5_block3_out' - Naive inception block will be inserted after fifth convolutional block.
+
+    """
     base_model = tf.keras.applications.resnet50.ResNet50(
         weights='imagenet',  
         input_shape=(224,224,3),
         include_top=False) 
     
-
-    layer_name = 'conv5_block3_out'
     feature_ex_model = Model(inputs=base_model.input, 
                              outputs=base_model.get_layer(layer_name).output, 
                              name='resnet50_features')
@@ -453,9 +463,9 @@ def resnetnaive_builder():
     bn1 = BatchNormalization(name='BN')(out)
     f = Flatten()(bn1)
     dropout = Dropout(0.4, name='Dropout')(f)
-    desne = Dense(num_classes, activation='softmax', name='Predictions')(dropout)
+    dense = Dense(num_classes, activation='softmax', name='Predictions')(dropout)
 
-    model = Model(inputs=feature_ex_model.input, outputs=desne)
+    model = Model(inputs=feature_ex_model.input, outputs=dense)
     return model
 
 def train_validate(model: Model, train_ds, val_ds, epochs=100, learning_rate=1e-3):
