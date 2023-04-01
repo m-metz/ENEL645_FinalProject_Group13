@@ -410,7 +410,7 @@ def vgginnet_builder():
 # Resnet50 + Naive Inception Block
 
 
-def resnetnaive_builder(layer_name):
+def resinnet50_builder(layer_name):
     """
     function that inserts a naive block of layers after a specific block of a pretrained resnet50's architecture. 
     Params:
