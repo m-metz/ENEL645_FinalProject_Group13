@@ -270,9 +270,9 @@ def preprocess_train_val(
             tf.keras.layers.RandomContrast(0.1, seed=random_seed),
             tf.keras.layers.RandomHeight(0.2, seed=random_seed),
             tf.keras.layers.RandomWidth(0.2, seed=random_seed),
-            tf.keras.layers.RandomZoom(0.2,seed=random_seed),
+            tf.keras.layers.RandomZoom(0.2, seed=random_seed),
             tf.keras.layers.Resizing(224, 340, crop_to_aspect_ratio=True)
-            
+
 
         ]
     )
@@ -340,28 +340,28 @@ def preprocess_test(
     return test_ds.prefetch(buffer_size=AUTOTUNE)
 
 
-
 # Models
 
 # Classic Resnet50 with transfer learning
 
 def resnet50_builder():
     base_model = tf.keras.applications.resnet50.ResNet50(
-        weights='imagenet',  
-        input_shape=(224,224,3),
-        include_top=False) 
+        weights='imagenet',
+        input_shape=(224, 224, 3),
+        include_top=False)
     base_model.trainable = False
 
-    x1 = base_model(base_model.input, training = False)
+    x1 = base_model(base_model.input, training=False)
     x2 = tf.keras.layers.Flatten()(x1)
     num_classes = 2
 
-    out = tf.keras.layers.Dense(num_classes, activation = 'softmax')(x2)
-    model = tf.keras.Model(inputs = base_model.input, outputs =out)
+    out = tf.keras.layers.Dense(num_classes, activation='softmax')(x2)
+    model = tf.keras.Model(inputs=base_model.input, outputs=out)
 
     return model
 
 # Vgg16 + Naive Inception Block
+
 
 def vgginnet_builder():
     base_model = VGG16(include_top=False, input_shape=(224, 224, 3))
@@ -409,6 +409,7 @@ def vgginnet_builder():
 
 # Resnet50 + Naive Inception Block
 
+
 def resnetnaive_builder(layer_name):
     """
     function that inserts a naive block of layers after a specific block of a pretrained resnet50's architecture. 
@@ -423,12 +424,12 @@ def resnetnaive_builder(layer_name):
 
     """
     base_model = tf.keras.applications.resnet50.ResNet50(
-        weights='imagenet',  
-        input_shape=(224,224,3),
-        include_top=False) 
-    
-    feature_ex_model = Model(inputs=base_model.input, 
-                             outputs=base_model.get_layer(layer_name).output, 
+        weights='imagenet',
+        input_shape=(224, 224, 3),
+        include_top=False)
+
+    feature_ex_model = Model(inputs=base_model.input,
+                             outputs=base_model.get_layer(layer_name).output,
                              name='resnet50_features')
     feature_ex_model.trainable = False
 
@@ -436,18 +437,18 @@ def resnetnaive_builder(layer_name):
     image_input = Input((224, 224, 3), name='Image_Input')
     p1_tensor = p1_layer(image_input)
 
-    out =feature_ex_model(p1_tensor)
+    out = feature_ex_model(p1_tensor)
     feature_ex_model = Model(inputs=image_input, outputs=out)
 
     def naive_inception_module(layer_in, f1, f2, f3):
         # 1x1 conv
-        conv1 = Conv2D(f1, (1,1), padding='same', activation='relu')(layer_in)
+        conv1 = Conv2D(f1, (1, 1), padding='same', activation='relu')(layer_in)
         # 3x3 conv
-        conv3 = Conv2D(f2, (3,3), padding='same', activation='relu')(layer_in)
+        conv3 = Conv2D(f2, (3, 3), padding='same', activation='relu')(layer_in)
         # 5x5 conv
-        conv5 = Conv2D(f3, (5,5), padding='same', activation='relu')(layer_in)
+        conv5 = Conv2D(f3, (5, 5), padding='same', activation='relu')(layer_in)
         # 3x3 max pooling
-        pool = MaxPooling2D((3,3), strides=(1,1), padding='same')(layer_in)
+        pool = MaxPooling2D((3, 3), strides=(1, 1), padding='same')(layer_in)
         # concatenate filters, assumes filters/channels last
         layer_out = Concatenate()([conv1, conv3, conv5, pool])
         return layer_out
@@ -458,10 +459,12 @@ def resnetnaive_builder(layer_name):
     bn1 = BatchNormalization(name='BN')(out)
     f = Flatten()(bn1)
     dropout = Dropout(0.4, name='Dropout')(f)
-    dense = Dense(num_classes, activation='softmax', name='Predictions')(dropout)
+    dense = Dense(num_classes, activation='softmax',
+                  name='Predictions')(dropout)
 
     model = Model(inputs=feature_ex_model.input, outputs=dense)
     return model
+
 
 def train_validate(model: Model, train_ds, val_ds, *, best_model_file='group_13_best_model.h5', epochs=100, learning_rate=1e-3):
 
@@ -503,10 +506,10 @@ def train_validate(model: Model, train_ds, val_ds, *, best_model_file='group_13_
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
         loss='categorical_crossentropy',
-        metrics=['accuracy', 
-                 tfa.metrics.F1Score(num_classes= 2, name='f1_score'),
+        metrics=['accuracy',
+                 tfa.metrics.F1Score(num_classes=2, name='f1_score'),
                  'mae'])
-                 
+
     model.fit(
         train_ds,
         epochs=epochs,
@@ -523,7 +526,6 @@ def test(model_file, test_ds: tf.data.Dataset):
     model: Model = tf.keras.models.load_model(model_file)
     metrics = model.evaluate(test_ds)
 
-    
     '''
     Rename f1_score to include class names, as f1 scores per class are outputted.
     '''
