@@ -46,7 +46,7 @@ raw strings can be used in-case you use a Windows path with `\`.
 
 If you want any other paths in this script to be cross platform, you *must* use
 the forward slash `/` to make the paths work on Linux or Mac. But if you are
-just using a path on only a Windows machine (like this DATASET_PATH) you can
+just using a path on only a Windows machine (like this dataset_path) you can
 use `\`.
 
 Also note you can't end a raw string with a `\` (and don't need to in this case
@@ -75,7 +75,7 @@ Set the test split. Train, validation, test split must add up to approximately 1
 
 random_seed = 154
 '''
-Used for configuring a consistent RANDOM_SEED where we need randomness with
+Used for configuring a consistent random_seed where we need randomness with
 reproducable results, like when shuffling the order of images.
 '''
 
